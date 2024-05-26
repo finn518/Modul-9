@@ -13,6 +13,12 @@ import android.widget.Toast
 import android.text.TextUtils
 import android.view.View
 import android.widget.Button
+import android.widget.LinearLayout
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.ValueEventListener
 
 class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
     private var tvEmail: TextView? = null
@@ -26,13 +32,12 @@ class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
     private lateinit var notedb: DatabaseReference
     private var firebaseDatabase: FirebaseDatabase? = null
     private var databaseReference: DatabaseReference? = null
-    var note: Note? = null
-    @SuppressLint("MissingInflatedId")
+    private lateinit var rv: RecyclerView
+    private var book: MutableList<Note> = mutableListOf()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_insert_note)
-        db = FirebaseDatabase.getInstance("https://modul9-4e60c-default-rtdb.asia-southeast1.firebasedatabase.app/").getReference()
-        notedb = db.child("notes")
         tvEmail = findViewById(R.id.tv_email)
         tvUid = findViewById(R.id.tv_uid)
         btnKeluar = findViewById(R.id.btn_keluar)
@@ -43,14 +48,40 @@ class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
         btnSubmit = findViewById(R.id.btn_submit)
         firebaseDatabase = FirebaseDatabase.getInstance()
         databaseReference = firebaseDatabase!!.reference
-        note = Note()
         btnSubmit.setOnClickListener(this)
+
+        rv = findViewById(R.id.rv)
+        val adapter = BookAdapter(this,book)
+        rv.adapter = adapter
+        rv.layoutManager = LinearLayoutManager(this)
+
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        val userId = currentUser!!.uid
+        db = FirebaseDatabase.getInstance("https://modul9-4e60c-default-rtdb.asia-southeast1.firebasedatabase.app/").getReference("users")
+        notedb = db.child(userId).child("notes")
+
+        notedb.addValueEventListener(object:ValueEventListener{
+            override fun onDataChange(snapshot: DataSnapshot) {
+                book.clear()
+                for(booksnapshot in snapshot.children){
+                    val note = booksnapshot.getValue(Note::class.java)
+                    note?.id = booksnapshot.key
+                    if (note !== null){
+                        book.add(note)
+                    }
+                }
+                adapter.notifyDataSetChanged()
+            }
+            override fun onCancelled(error: DatabaseError) {
+                Toast.makeText(this@InsertNoteActivity, "Tidak bisa mendapatkan data", Toast.LENGTH_SHORT).show()
+            }
+        })
+
     }
 
     override fun onStart() {
 
         super.onStart()
-// Check if user is signed in (non-null) and update UI accordingly.
         val currentUser = mAuth!!.currentUser
         if (currentUser != null) {
             tvEmail!!.text = currentUser.email
@@ -68,7 +99,7 @@ class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
         val intent = Intent(this@InsertNoteActivity,
             MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                Intent.FLAG_ACTIVITY_CLEAR_TASK //makesure user cant go back
+                Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
     }
     fun submitData() {
@@ -77,13 +108,18 @@ class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
         }
         val title = etTitle!!.text.toString()
         val desc = etDesc!!.text.toString()
-        val baru = Note(title, desc)
-        databaseReference!!.child("notes").child(mAuth!!.uid!!).push().setValue(baru).addOnSuccessListener(this) {
+        val id = notedb.push().key
+        val baru = Note(id = id
+            ,title = title
+            , description  = desc)
+        notedb.child(id!!).setValue(baru).addOnSuccessListener {
             Toast.makeText(this@InsertNoteActivity, "Add data",
-                Toast.LENGTH_SHORT).show() }.addOnFailureListener(this) {
+                Toast.LENGTH_SHORT).show() }.addOnFailureListener(this)
+        {
             Toast.makeText(this@InsertNoteActivity, "Failed to Add data",
                 Toast.LENGTH_SHORT).show() }
-        saveData()
+        etTitle!!.text.clear()
+        etDesc!!.text.clear()
     }
     private fun validateForm(): Boolean {
         var result = true
@@ -101,29 +137,5 @@ class InsertNoteActivity : AppCompatActivity(), View.OnClickListener {
         }
         return result
     }
-    private fun saveData() {
-        if (!validateForm()) {
-            return
-        }
-        val title = etTitle?.text.toString()
-        val desc = etDesc?.text.toString()
-        val id = notedb.push().key
-        val note = Note()
-        note.title = title
-        note.description = desc
-        notedb.child(id!!).setValue(note)
-        etTitle?.text?.clear()
-        etDesc?.text?.clear()
 
-    }
-
-}
-class Note {
-    var title: String? = null
-    var description: String? = null
-    constructor() {}
-    constructor(title: String?, description: String?) {
-        this.title = title
-        this.description = description
-    }
 }

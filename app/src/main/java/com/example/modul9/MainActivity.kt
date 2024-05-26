@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.Toast
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.database.FirebaseDatabase
 
 class MainActivity : AppCompatActivity(), View.OnClickListener {
     private var etEmail: EditText? = null
@@ -53,20 +54,27 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mAuth!!.createUserWithEmailAndPassword(email!!, password!!)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-// Sign in success, update UI with the signed-in user's information
-
                     Log.d(
                         ContentValues.TAG,
                         "createUserWithEmail:success")
                     val user = mAuth!!.currentUser
+                    val userId = user!!.uid
+                    val database = FirebaseDatabase.getInstance("https://modul9-4e60c-default-rtdb.asia-southeast1.firebasedatabase.app/")
+                    val userRef = database.getReference("users").child(userId)
+                    val userData = mapOf(
+                        "email" to email,
+                        "uid" to userId
+                    )
 
+                    userRef.setValue(userData).addOnCompleteListener { task ->
+                        if (task.isSuccessful) {
+                            Toast.makeText(this@MainActivity, "User registered successfully", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(this@MainActivity, "Failed to register user", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                     updateUI(user)
-                    Toast.makeText(this@MainActivity,
-
-                        user.toString(),
-                        Toast.LENGTH_SHORT).show()
                 } else {
-// If sign in fails, display a message to the user.
                     Log.w(ContentValues.TAG,
                         "createUserWithEmail:failure", task.exception)
                     Toast.makeText(this@MainActivity,
@@ -83,7 +91,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         mAuth!!.signInWithEmailAndPassword(email!!, password!!)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-// Sign in success, update UI with the signed-in user's information
                     Log.d(ContentValues.TAG,
                         "signInWithEmail:success")
                     val user = mAuth!!.currentUser
@@ -93,7 +100,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                         Toast.LENGTH_SHORT).show()
                     updateUI(user)
                 } else {
-// If sign in fails, display a message to the user.
                     Log.w(ContentValues.TAG,
                         "signInWithEmail:failure", task.exception)
                     Toast.makeText(this@MainActivity,
